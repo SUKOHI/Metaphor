@@ -18,30 +18,27 @@ In this case, you're generating a meta table for a table called `items`.
 
 ###1. Model
 
-Set `MetaphorTrait` in your model like this.
+Set `MetaphorTrait` and `$metaKeys` in your model like this.
 
     use Sukohi\Metaphor\MetaphorTrait;
     
     class Item extends Model
     {
         use MetaphorTrait;
-    }
-
-and save new model for a meta table.
-
-    use Illuminate\Database\Eloquent\Model;
     
-    class ItemMeta extends Model
-    {
-        public $table = 'items_meta';
-        public $guarded = ['id', 'created_at', 'updated_at'];
-    }
+        public $metaKeys = [
+            'price',
+            'size',
+            'weight',
+            'years',
+            'memo'
+        ];
 
 ###2. Meta Table
 
 Execute the following command to generate a migration file.
 
-    php artisan make:migration crate_items_meta_table
+    php artisan make:migration create_items_meta_table
 
    
 Set DB table schema there
@@ -58,9 +55,6 @@ Set DB table schema there
             with(new \App\Item)->metaTableCreate($table);
 
         });
-            
-        // You also can manually write your own custom schema here instead.
-        
     }
     
     /**
@@ -84,48 +78,65 @@ Usage
 
 ###Retrieve value
 
-    $item = \App\Item::find(1);
+    echo $item->price;
+    echo $item->size;
+    echo $item->weight;
+    echo print_r($item->years);
+    echo $item->memo;
+    echo $item->purchased_at;
     
-    echo $item->getMeta('meta_key_1');
-    echo $item->getMeta('meta_key_2');
-    echo $item->getMeta('meta_key_3');
-    print_r($item->getMeta('meta_key_4'));
-    print_r($item->getMeta('meta_key_5'));
-    echo $item->getMeta('meta_key_6');
-    
-    print_r($item->getMeta());  // Get All Values
-    
-    // or
-    
-    echo $item->meta_key_1;
-    echo $item->meta_key_2;
-    echo $item->meta_key_3;
-    echo $item->meta_key_4;
-    echo $item->meta_key_5;
-    echo $item->meta_key_6;
-    
-    print_r($item->meta);
+or 
+
+    print_r($item->getMeta());  // All data
 
 ###Save value
     
-    $item = \App\Item::find(1);
+Insert
     
-    $item->setMeta('meta_key_1', 'String');
-    $item->setMeta('meta_key_2', 1);
-    $item->setMeta('meta_key_3', 1.5);
-    $item->setMeta('meta_key_4', ['value - 1', 'value -2']);
-    $item->setMeta('meta_key_5', ['key' => 'key', 'value' => 'value']);
-    $item->setMeta('meta_key_6', null);
+    $item = new \App\Item;
+    $item->price = 500;
+    $item->size = 3.5;
+    $item->weight = '50kg';
+    $item->years = [2013, 2014, 2015];
+    $item->memo = null;
+    $item->purchased_at = new Carbon();
     $item->save();
     
-    // or
+Update
     
-    $item->meta_key_1 = 'String';
-    $item->meta_key_2 = 1;
-    $item->meta_key_3 = 1.5;
-    $item->meta_key_4 = ['value - 1', 'value -2'];
-    $item->meta_key_5 = ['key' => 'key', 'value' => 'value']);
-    $item->meta_key_6 = null;
+    $item = \App\Item::find(1);
+    $item->price = 500;
+    $item->size = 3.5;
+    $item->weight = '50kg';
+    $item->years = [2013, 2014, 2015];
+    $item->memo = null;
+    $item->purchased_at = new Carbon();
+    $item->save();
+    
+or You also can save meta values like this.
+
+    $item->setMeta([
+        'price' => 600,
+        'size' => 4.5,
+        'weight' => '65kg',
+        'years' => [2013, 2014, 2015],
+        'memo' => null,
+        'purchased_at' => new Carbon()
+    ]);
+
+###Remove value
+
+    $item->unset('meta_key');
+    $item->save();
+
+About original value
+====
+
+Of course you also can set original value at the same time like the next.
+
+    $item = new \App\Item;
+    $item->title = 500;
+    $item->size = 3.5;
     $item->save();
 
 About value type

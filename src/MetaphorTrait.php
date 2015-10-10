@@ -2,92 +2,66 @@
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 trait MetaphorTrait {
 
-    public $metaModel = null;
-    private $_meta_checked = false;
-    private $_meta_data = [];
-    private $_table_columns = [];
-    private $_column_names = [];
-
-    // Construct
-
-    public function __construct(array $attributes = [])
-    {
-        parent::__construct($attributes);
-    }
-
-    // Eager Loading
-
-    public function meta() {
-
-        $meta_model = $this->getMetaModel();
-        return $this->hasMany($meta_model, 'parent_id', 'id');
-
-    }
+    private $_meta_table = null;
+    private $_parent_id = 'parent_id';
+    private $_meta_attributes = [];
+    private $_retrieved_flag = false;
 
     // Magic Methods
 
     public function __get($key) {
 
-        if($this->hasGetMutator($key)
-            || $this->hasColumn($key)
-            || $key == 'meta') {
+        if($this->hasMetaKey($key)) {
 
-            return parent::__get($key);
+            return $this->getMeta($key);
 
         }
 
-        return $this->getMeta($key);
+        return parent::__get($key);
 
     }
 
     public function __set($key, $value) {
 
-        if ($this->hasSetMutator($key) || $this->hasColumn($key)) {
-
-            parent::__set($key, $value);
-
-        } else {
+        if($this->hasMetaKey($key)) {
 
             $this->setMeta($key, $value);
+            return;
 
         }
+
+        parent::__set($key, $value);
 
     }
 
     // Public Methods
 
-    public function hasMeta($key) {
-
-        $this->checkMeta();
-        return isset($this->_meta_data[$key]);
-
-    }
-
     public function getMeta($key = '') {
 
-        $this->checkMeta();
+        $this->retrieveMeta();
 
-        if($key == '') {
+        $values = [];
 
-            $values = [];
+        foreach ($this->metaKeys as $meta_column) {
 
-            foreach ($this->_meta_data as $meta_key => $meta_values) {
+            if(isset($this->_meta_attributes[$meta_column])) {
 
-                $values[$meta_key] = $meta_values['value'];
+                $values[$meta_column] = $this->_meta_attributes[$meta_column];
 
             }
 
-            return $values;
-
         }
 
-        if(isset($this->_meta_data[$key])) {
+        if($key == '') {
 
-            return $this->_meta_data[$key]['value'];
+            return $values;
+
+        } else if(isset($values[$key])) {
+
+            return $this->_meta_attributes[$key];
 
         }
 
@@ -95,25 +69,53 @@ trait MetaphorTrait {
 
     }
 
-    public function setMeta($key, $value) {
+    public function setMeta($key, $value = '') {
 
-        $this->checkMeta();
+        $this->retrieveMeta();
 
-        $id = ($this->hasMeta($key)) ? $this->_meta_data[$key]['id'] : -1;
-        $this->_meta_data[$key] = [
-            'id' => $id,
-            'value' => $value
-        ];
+        if(is_array($key) && $value == '') {
+
+            $meta_values = $key;
+
+            foreach ($meta_values as $key => $value) {
+
+                if($this->hasMetaKey($key)) {
+
+                    $this->_meta_attributes[$key] = $value;
+
+                }
+
+            }
+
+        } else {
+
+            if($this->hasMetaKey($key)) {
+
+                $this->_meta_attributes[$key] = $value;
+
+            }
+
+        }
+
+    }
+
+    public function unsetMeta($key) {
+
+        if($this->hasMetaKey($key) && isset($this->_meta_attributes[$key])) {
+
+            unset($this->_meta_attributes[$key]);
+
+        }
 
     }
 
     public function metaTableCreate($table) {
 
         $table->increments('id');
-        $table->integer('parent_id')
+        $table->integer($this->_parent_id)
             ->unsigned()
             ->index();
-        $table->foreign('parent_id')
+        $table->foreign($this->_parent_id)
             ->references('id')
             ->on($this->getTable())
             ->onDelete('cascade');
@@ -122,7 +124,7 @@ trait MetaphorTrait {
         $table->text('meta_value')->nullable();
         $table->timestamps();
         $table->unique([
-            'parent_id',
+            $this->_parent_id,
             'meta_key'
         ]);
 
@@ -132,25 +134,67 @@ trait MetaphorTrait {
 
     public function save(array $options = []) {
 
-        $meta_model = $this->getMetaModel();
+        $meta_table = $this->getMetaTable();
         \DB::beginTransaction();
 
         if(parent::save($options)) {
 
-            if(!empty($this->_meta_data)) {
+            if(!empty($this->_meta_attributes)) {
 
-                foreach ($this->_meta_data as $meta_key => $meta_values) {
+                $dt = Carbon::now();
+                $meta_data = DB::table($meta_table)
+                                    ->where($this->_parent_id, $this->id)
+                                    ->get();
+                $meta_attributes = $this->_meta_attributes;
 
-                    $meta_value = $meta_values['value'];
-                    $type = $this->getMetaType($meta_value);
-                    $meta_record = $meta_model::firstOrNew([
-                        'id' => $meta_values['id']
-                    ]);
-                    $meta_record->parent_id = $this->id;
-                    $meta_record->type = $type;
-                    $meta_record->meta_key = $meta_key;
-                    $meta_record->meta_value = $this->encodeValue($type, $meta_value);
-                    $meta_record->save();
+                foreach ($meta_data as $meta) {
+
+                    $key = $meta->meta_key;
+
+                    if(!isset($meta_attributes[$key])) {
+
+                        DB::table($meta_table)
+                            ->where($this->_parent_id, $this->id)
+                            ->where('meta_key', $key)
+                            ->delete();
+
+                    } else {
+
+                        $value = $meta_attributes[$key];
+                        $type = $this->getMetaType($value);
+
+                        DB::table($meta_table)
+                            ->where($this->_parent_id, $this->id)
+                            ->where('meta_key', $key)
+                            ->update([
+                                'type' => $type,
+                                'meta_value' => $this->encodeValue($type, $value),
+                                'updated_at' => $dt
+                            ]);
+
+                    }
+
+                    unset($meta_attributes[$key]);
+
+                }
+
+                if(count($meta_attributes) > 0) {
+
+                    foreach ($meta_attributes as $key => $value) {
+
+                        $type = $this->getMetaType($value);
+
+                        DB::table($meta_table)->insert([
+                            $this->_parent_id => $this->id,
+                            'type' => $type,
+                            'meta_key' => $key,
+                            'meta_value' => $this->encodeValue($type, $value),
+                            'created_at' => $dt,
+                            'updated_at' => $dt
+                        ]);
+
+                    }
+
 
                 }
 
@@ -164,46 +208,41 @@ trait MetaphorTrait {
 
     // Private Methods
 
-    private function checkMeta() {
+    private function retrieveMeta() {
 
-        if(!$this->_meta_checked) {
+        if(!$this->_retrieved_flag) {
 
-            if(!isset($this->attributes['meta'])) {
+            $meta_table = $this->getMetaTable();
+            $meta_data = DB::table($meta_table)
+                            ->where($this->_parent_id, $this->id)
+                            ->get();
 
-                $this->__get('meta');
+            foreach ($meta_data as $meta) {
 
-            }
-
-            if($this->meta->count() > 0) {
-
-                foreach ($this->meta as $meta) {
-
-                    $type = $meta->type;
-                    $meta_key = $meta->meta_key;
-                    $this->_meta_data[$meta_key] = [
-                        'id' => $meta->id,
-                        'value' => $this->decodeValue($type, $meta->meta_value)
-                    ];
-
-                }
+                $type = $meta->type;
+                $meta_key = $meta->meta_key;
+                $meta_value = $this->decodeValue($type, $meta->meta_value);
+                $this->_meta_attributes[$meta_key] = $meta_value;
 
             }
 
-            $this->_meta_checked = true;
+            $this->_retrieved_flag = true;
 
         }
 
     }
 
-    private function getMetaModel() {
+    private function getMetaTable() {
 
-        if($this->metaModel == null) {
+        if($this->_meta_table == null) {
 
-            $this->metaModel = __CLASS__ .'Meta';
+            $class_parts = explode('\\', __CLASS__);
+            $class = array_pop($class_parts);
+            $this->_meta_table = strtolower(str_plural($class)) .'_meta';
 
         }
 
-        return $this->metaModel;
+        return $this->_meta_table;
 
     }
 
@@ -273,15 +312,9 @@ trait MetaphorTrait {
 
     }
 
-    private function hasColumn($key) {
+    private function hasMetaKey($key) {
 
-        if(empty($this->_column_names)) {
-
-            $this->_column_names = Schema::getColumnListing($this->getTable());
-
-        }
-
-        return (in_array($key, $this->_column_names));
+        return in_array($key, $this->metaKeys);
 
     }
 
