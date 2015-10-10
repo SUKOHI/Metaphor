@@ -2,7 +2,6 @@
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 trait MetaphorTrait {
 
@@ -31,7 +30,9 @@ trait MetaphorTrait {
 
     public function __get($key) {
 
-        if($this->hasColumn($key) || method_exists($this, $key)) {
+        if(array_key_exists($key, $this->attributes)
+            || $this->hasGetMutator($key)
+            || method_exists($this, $key)) {
 
             return parent::__get($key);
 
@@ -43,7 +44,7 @@ trait MetaphorTrait {
 
     public function __set($key, $value) {
 
-        if($this->hasColumn($key)) {
+        if ($this->hasSetMutator($key)) {
 
             parent::__set($key, $value);
 
@@ -267,18 +268,6 @@ trait MetaphorTrait {
         }
 
         return $value;
-
-    }
-
-    private function hasColumn($key) {
-
-        if(empty($this->_table_columns)) {
-
-            $this->_table_columns = Schema::getColumnListing($this->getTable());
-
-        }
-
-        return (in_array($key, $this->_table_columns));
 
     }
 
