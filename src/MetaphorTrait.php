@@ -2,38 +2,50 @@
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Mockery\CountValidator\Exception;
 
 trait MetaphorTrait {
 
     private $_meta_table = null;
     private $_parent_id = 'parent_id';
     private $_meta_attributes = [];
+    private $_table_columns = [];
     private $_retrieved_flag = false;
 
     // Magic Methods
 
     public function __get($key) {
 
-        if($this->hasMetaKey($key)) {
+        $columns = $this->getTableColumns();
 
-            return $this->getMeta($key);
+        if(array_key_exists($key, $this->attributes)
+                || $this->hasGetMutator($key)
+                || $this->relationLoaded($key)
+                || method_exists($this, $key)
+                || in_array($key, $columns)) {
+
+            return parent::__get($key);
 
         }
 
-        return parent::__get($key);
+        return $this->getMeta($key);
 
     }
 
     public function __set($key, $value) {
 
-        if($this->hasMetaKey($key)) {
+        $columns = $this->getTableColumns();
 
-            $this->setMeta($key, $value);
-            return;
+        if($this->hasSetMutator($key)
+                || (in_array($key, $this->getDates()) && $value)
+                || ($this->isJsonCastable($key) && ! is_null($value))
+                || in_array($key, $columns)) {
+
+            return parent::__set($key, $value);
 
         }
 
-        parent::__set($key, $value);
+        $this->setMeta($key, $value);
 
     }
 
@@ -43,23 +55,11 @@ trait MetaphorTrait {
 
         $this->retrieveMeta();
 
-        $values = [];
-
-        foreach ($this->metaKeys as $meta_column) {
-
-            if(isset($this->_meta_attributes[$meta_column])) {
-
-                $values[$meta_column] = $this->_meta_attributes[$meta_column];
-
-            }
-
-        }
-
         if($key == '') {
 
-            return $values;
+            return $this->_meta_attributes;
 
-        } else if(isset($values[$key])) {
+        } else if(isset($this->_meta_attributes[$key])) {
 
             return $this->_meta_attributes[$key];
 
@@ -73,27 +73,19 @@ trait MetaphorTrait {
 
         $this->retrieveMeta();
 
-        if(is_array($key) && $value == '') {
+        if(is_array($key)) {
 
-            $meta_values = $key;
+            $values = $key;
 
-            foreach ($meta_values as $key => $value) {
+            foreach ($values as $key => $value) {
 
-                if($this->hasMetaKey($key)) {
-
-                    $this->_meta_attributes[$key] = $value;
-
-                }
+                $this->_meta_attributes[$key] = $value;
 
             }
 
         } else {
 
-            if($this->hasMetaKey($key)) {
-
-                $this->_meta_attributes[$key] = $value;
-
-            }
+            $this->_meta_attributes[$key] = $value;
 
         }
 
@@ -101,7 +93,7 @@ trait MetaphorTrait {
 
     public function unsetMeta($key) {
 
-        if($this->hasMetaKey($key) && isset($this->_meta_attributes[$key])) {
+        if(isset($this->_meta_attributes[$key])) {
 
             unset($this->_meta_attributes[$key]);
 
@@ -134,27 +126,30 @@ trait MetaphorTrait {
 
     public function save(array $options = []) {
 
-        $meta_table = $this->getMetaTable();
         \DB::beginTransaction();
 
-        if(parent::save($options)) {
+        try {
 
-            if(!empty($this->_meta_attributes)) {
+            $saved = parent::save($options);
+            $id = $this->getParentId();
+
+            if($id && !empty($this->_meta_attributes)) {
 
                 $dt = Carbon::now();
+                $meta_table = $this->getMetaTable();
                 $meta_data = DB::table($meta_table)
-                                    ->where($this->_parent_id, $this->id)
-                                    ->get();
+                    ->where($this->_parent_id, $id)
+                    ->get();
                 $meta_attributes = $this->_meta_attributes;
 
                 foreach ($meta_data as $meta) {
 
                     $key = $meta->meta_key;
 
-                    if(!isset($meta_attributes[$key])) {
+                    if(!array_key_exists($key, $meta_attributes)) {
 
                         DB::table($meta_table)
-                            ->where($this->_parent_id, $this->id)
+                            ->where($this->_parent_id, $id)
                             ->where('meta_key', $key)
                             ->delete();
 
@@ -164,7 +159,7 @@ trait MetaphorTrait {
                         $type = $this->getMetaType($value);
 
                         DB::table($meta_table)
-                            ->where($this->_parent_id, $this->id)
+                            ->where($this->_parent_id, $id)
                             ->where('meta_key', $key)
                             ->update([
                                 'type' => $type,
@@ -185,7 +180,7 @@ trait MetaphorTrait {
                         $type = $this->getMetaType($value);
 
                         DB::table($meta_table)->insert([
-                            $this->_parent_id => $this->id,
+                            $this->_parent_id => $id,
                             'type' => $type,
                             'meta_key' => $key,
                             'meta_value' => $this->encodeValue($type, $value),
@@ -200,9 +195,16 @@ trait MetaphorTrait {
 
             }
 
+            DB::commit();
+            return $saved;
+
+        } catch(Exception $e) {
+
+            DB::rollback();
+
         }
 
-        DB::commit();
+        return false;
 
     }
 
@@ -210,11 +212,14 @@ trait MetaphorTrait {
 
     private function retrieveMeta() {
 
-        if(!$this->_retrieved_flag) {
+        $id = $this->getParentId();
+
+        if($id && !$this->_retrieved_flag) {
 
             $meta_table = $this->getMetaTable();
             $meta_data = DB::table($meta_table)
-                            ->where($this->_parent_id, $this->id)
+                            ->where($this->_parent_id, $id)
+                            ->orderBy('meta_key')
                             ->get();
 
             foreach ($meta_data as $meta) {
@@ -312,9 +317,24 @@ trait MetaphorTrait {
 
     }
 
-    private function hasMetaKey($key) {
+    private function getParentId() {
 
-        return in_array($key, $this->metaKeys);
+        return $this->getAttribute('id');
+
+    }
+
+    private function getTableColumns() {
+
+        if(empty($this->_table_columns)) {
+
+            $table = $this->getTable();
+            $this->_table_columns = $this->getConnection()
+                                        ->getSchemaBuilder()
+                                        ->getColumnListing($table);
+
+        }
+
+        return $this->_table_columns;
 
     }
 
