@@ -84,7 +84,7 @@ Usage
 
 ###Retrieve value
 
-    $item = \App\Item::with('meta')->find(1);
+    $item = \App\Item::find(1);
     
     echo $item->getMeta('meta_key_1');
     echo $item->getMeta('meta_key_2');
