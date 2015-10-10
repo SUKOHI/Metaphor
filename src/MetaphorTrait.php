@@ -2,6 +2,7 @@
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 trait MetaphorTrait {
 
@@ -9,6 +10,7 @@ trait MetaphorTrait {
     private $_meta_checked = false;
     private $_meta_data = [];
     private $_table_columns = [];
+    private $_column_names = [];
 
     // Construct
 
@@ -30,9 +32,9 @@ trait MetaphorTrait {
 
     public function __get($key) {
 
-        if(array_key_exists($key, $this->attributes)
-            || $this->hasGetMutator($key)
-            || method_exists($this, $key)) {
+        if($this->hasGetMutator($key)
+            || $this->hasColumn($key)
+            || $key == 'meta') {
 
             return parent::__get($key);
 
@@ -44,7 +46,7 @@ trait MetaphorTrait {
 
     public function __set($key, $value) {
 
-        if ($this->hasSetMutator($key)) {
+        if ($this->hasSetMutator($key) || $this->hasColumn($key)) {
 
             parent::__set($key, $value);
 
@@ -166,9 +168,9 @@ trait MetaphorTrait {
 
         if(!$this->_meta_checked) {
 
-            if(!$this->meta) {
+            if(!isset($this->attributes['meta'])) {
 
-                parent::__get('meta');
+                $this->__get('meta');
 
             }
 
@@ -268,6 +270,18 @@ trait MetaphorTrait {
         }
 
         return $value;
+
+    }
+
+    private function hasColumn($key) {
+
+        if(empty($this->_column_names)) {
+
+            $this->_column_names = Schema::getColumnListing($this->getTable());
+
+        }
+
+        return (in_array($key, $this->_column_names));
 
     }
 
