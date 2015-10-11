@@ -122,6 +122,20 @@ trait MetaphorTrait {
 
     }
 
+    public function getMetaTable() {
+
+        if($this->_meta_table == null) {
+
+            $class_parts = explode('\\', __CLASS__);
+            $class = array_pop($class_parts);
+            $this->_meta_table = strtolower(str_plural($class)) .'_meta';
+
+        }
+
+        return $this->_meta_table;
+
+    }
+
     // Override Methods
 
     public function save(array $options = []) {
@@ -234,20 +248,6 @@ trait MetaphorTrait {
             $this->_retrieved_flag = true;
 
         }
-
-    }
-
-    private function getMetaTable() {
-
-        if($this->_meta_table == null) {
-
-            $class_parts = explode('\\', __CLASS__);
-            $class = array_pop($class_parts);
-            $this->_meta_table = strtolower(str_plural($class)) .'_meta';
-
-        }
-
-        return $this->_meta_table;
 
     }
 

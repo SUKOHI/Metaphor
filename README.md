@@ -20,11 +20,11 @@ In this case, you're generating a meta table for a table called `items`.
 
 Set `MetaphorTrait` in your model like this.
 
-    use Sukohi\Metaphor\MetaphorTrait;
+    use Sukohi\Metaphor\MetaphorModel;
     
-    class Item extends Model
+    class Item extends MetaphorModel
     {
-        use MetaphorTrait;
+        //
     }
 
 ###2. Meta Table
@@ -73,18 +73,16 @@ Usage
 
 You can get values as you retrieve original value like this.
 
+    $item = \App\Item::find(1);
     echo $item->price;
-    echo $item->size;
-    echo $item->weight;
-    echo print_r($item->years);
-    echo $item->memo;
-    echo $item->purchased_at;
     
-`$item->getMeta('META_KEY');` is also available.
+or
     
-or 
+    $item->getMeta('META_KEY');
+    
+When retrieving all meta values as array
 
-    print_r($item->getMeta());  // All data
+    $item->getMeta();
 
 ###Save value
 
@@ -94,34 +92,24 @@ Insert
     
     $item = new \App\Item;
     $item->price = 500;
-    $item->size = 3.5;
-    $item->weight = '50kg';
-    $item->years = [2013, 2014, 2015];
-    $item->memo = null;
-    $item->purchased_at = new Carbon();
     $item->save();
     
 Update
     
     $item = \App\Item::find(1);
     $item->price = 500;
-    $item->size = 3.5;
-    $item->weight = '50kg';
-    $item->years = [2013, 2014, 2015];
-    $item->memo = null;
-    $item->purchased_at = new Carbon();
+    $item->save();
+
+or 
+
+    $item->setMeta('META_KEY', 'META_VALUE');
     $item->save();
     
-`$item->setMeta('META_KEY', 'META_VALUE');` is also available.
-    
-or You also can save meta values like this.
+When saving meta values using array.
 
     $item->setMeta([
         'price' => 600,
-        'size' => 4.5,
-        'weight' => '65kg',
         'years' => [2013, 2014, 2015],
-        'memo' => null,
         'purchased_at' => new Carbon()
     ]);
 
@@ -129,6 +117,34 @@ or You also can save meta values like this.
 
     $item->unset('meta_key');
     $item->save();
+
+###with Where clause
+
+You can use where the following methods for meta table when retrieving data.  
+
+* whereMeta
+* orWhereMeta
+* whereBetweenMeta
+* whereNotBetweenMeta
+* whereInMeta
+* whereNotInMeta
+* whereNullMeta
+* whereNotNullMeta
+
+Usage is the same with original where methods like this.
+
+    $items = \App\Item::where('id', '>', 0)
+                ->whereMeta('size', '1')
+                ->whereBetweenMeta('size', [1, 2])
+                ->whereNotBetweenMeta('size', [3, 5])
+                ->whereInMeta('size', [1, 5])
+                ->whereNotInMeta('size', [2, 3, 4])
+                ->whereNullMeta('memo')
+                ->whereNotNullMeta('memo')
+                ->orWhereMeta('size', 'LIKE', '%5%')
+                ->get();
+
+*The first argument means meta key you want to get.
 
 About original value
 ====
