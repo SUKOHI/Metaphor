@@ -18,7 +18,7 @@ In this case, you're generating a meta table for a table called `items`.
 
 ###1. Model
 
-Set `MetaphorTrait` in your model like this.
+Set `MetaphorModel` in your model like this.
 
     use Sukohi\Metaphor\MetaphorModel;
     
