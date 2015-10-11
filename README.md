@@ -120,7 +120,7 @@ When saving meta values using array.
 
 ###with Where clause
 
-You can use where the following methods for meta table when retrieving data.  
+You can use the following `where` methods for meta table when retrieving data.  
 
 * whereMeta
 * orWhereMeta
