@@ -71,7 +71,7 @@ Usage
 
 ###Retrieve value
 
-You can get values as you retrieve original value like this.
+You can get meta values as you retrieve original value like this.
 
     $item = \App\Item::find(1);
     echo $item->price;
