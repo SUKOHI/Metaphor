@@ -152,8 +152,8 @@ About original value
 Of course you also can set original value at the same time like the next.
 
     $item = new \App\Item;
-    $item->title = 500;
-    $item->size = 3.5;
+    $item->title = 500;     // Original value
+    $item->size = 3.5;      // Meta value
     $item->save();
 
 About value type
