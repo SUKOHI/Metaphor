@@ -151,4 +151,23 @@ trait MetaphorTrait {
 
     }
 
+    public function scopeOrderByMeta($query, $key, $direction = 'asc') {
+
+        $parent_ids_1 = MetaphorMeta::where('parent', __CLASS__)
+            ->where('key', $key)
+            ->orderBy('value', $direction)
+            ->pluck('parent_id');
+        $parent_ids_2 = MetaphorMeta::whereNotIn('parent_id', $parent_ids_1)
+            ->groupBy('parent_id')
+            ->pluck('parent_id');
+        $parent_ids = $parent_ids_1->merge($parent_ids_2);
+
+        if($parent_ids->count() > 0) {
+
+            $query->orderByRaw('FIELD(id,'. $parent_ids->implode(',') .')');
+
+        }
+
+    }
+
 }
