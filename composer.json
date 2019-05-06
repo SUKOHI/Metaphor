@@ -1,20 +1,30 @@
 {
     "name": "sukohi/metaphor",
-    "description": "A Laravel package to manage meta values of a specific DB table.",
+    "description": "A Laravel package that allows you to manage metadata.",
     "authors": [
         {
-            "name": "Sukohi",
+            "name": "sukohi",
             "email": "capilano.sukohi@gmail.com"
         }
     ],
     "license": "MIT",
     "require": {
-        "laravel/framework": "~5.0"
+        "laravel/framework": "~5.8.13"
     },
     "autoload": {
         "psr-4": {
             "Sukohi\\Metaphor\\": "src/"
         }
     },
-    "minimum-stability": "stable"
+    "minimum-stability": "stable",
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Sukohi\\Metaphor\\MetaphorServiceProvider"
+            ],
+            "aliases": {
+                "Metaphor": "Sukohi\\Metaphor\\Facades\\Metaphor"
+            }
+        }
+    }
 }

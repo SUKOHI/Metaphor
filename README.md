@@ -1,170 +1,116 @@
-Metaphor
-=====
+# Metaphor
+A Laravel package that allows you to manage metadata.
+This package is maintained under Laravel 5.8.
 
-A Laravel package to manage meta values of a specific DB table.  
-(This is for Laravel 5+.)
+# Installation
+Run the following command.
 
-Installation
-====
+    composer require sukohi/metaphor:3.*
 
-Execute composer command.
+# Preparation
 
-    composer require sukohi/metaphor:2.*
+## 1. Trait
 
-Preparation
-====
+Set `MetaphorTrait` in your model as follows.
 
-In this case, you're generating a meta table for a table called `items`. 
-
-###1. Model
-
-Set `MetaphorModel` in your model like this.
-
-    use Sukohi\Metaphor\MetaphorModel;
+    <?php
     
-    class Item extends MetaphorModel
+    namespace App;
+    
+    use Illuminate\Database\Eloquent\Model;
+    use Sukohi\Metaphor\MetaphorTrait;
+    
+    class Item extends Model
     {
-        //
-    }
-
-###2. Meta Table
-
-Execute the following command to generate a migration file.
-
-    php artisan make:migration create_items_meta_table
-
-   
-Set DB table schema there
-
-    /**
-    * Run the migrations.
-    *
-    * @return void
-    */
-    public function up()
-    {
-        \Schema::create('items_meta', function (Blueprint $table) {
-
-            with(new \App\Item)->metaTableCreate($table);
-
-        });
+        use MetaphorTrait;
     }
     
-    /**
-    * Reverse the migrations.
-    *
-    * @return void
-    */
-    public function down()
-    {
-        Schema::drop('items_meta');
-    }
-    
+## 2. Migration
 
-Execute migration.
+Just run the migration command.  
+
+**Note:** You do NOT need to make any migrations by yourself because this package already has it.
 
     php artisan migrate
+    
+That's it!
 
+# Usage
 
-Usage
-====
-
-###Retrieve value
-
-You can get meta values as you retrieve original value like this.
+## Save
 
     $item = \App\Item::find(1);
-    echo $item->price;
+    $item->meta->key_1 = 300;
+    $item->meta->key_2 = 'yyy';
+    $item->meta->key_3 = ['item_1x', 'item_2', 'item_3'];
+    $item->meta->key_4 = null;
+    $item->meta->save();
     
-or
+**Note:** `$item->meta` is an extended Collection of Laravel.  
+So you can use all of the methods as usual.
     
-    $item->getMeta('META_KEY');
+## Delete
+
+    $item->meta->delete($key);
     
-When retrieving all meta values as array
-
-    $item->getMeta();
-
-###Save value
-
-You can save values as you set original value like this.
-
-Insert
+    // or
     
-    $item = new \App\Item;
-    $item->price = 500;
-    $item->save();
+    $item->meta->deleteAll();
     
-Update
+## Check if a meta value exists
+
+    if($item->meta->has($key)) {
+
+        // has it!
+
+    }
+
+# About appending
+
+If you'd like metadata to include in model data, set `meta` to `$appends`.
+
+    <?php
     
-    $item = \App\Item::find(1);
-    $item->price = 500;
-    $item->save();
-
-or 
-
-    $item->setMeta('META_KEY', 'META_VALUE');
-    $item->save();
+    namespace App;
     
-When saving meta values using array.
+    use Illuminate\Database\Eloquent\Model;
+    use Sukohi\Metaphor\MetaphorTrait;
+    
+    class Item extends Model
+    {
+        use MetaphorTrait;
+        protected $appends = ['meta'];  // <- here
+    }
 
-    $item->setMeta([
-        'price' => 600,
-        'years' => [2013, 2014, 2015],
-        'purchased_at' => new Carbon()
-    ]);
+# Where clause
 
-###Remove value
+## 1. whereMeta
 
-    $item->unset('meta_key');
-    $item->save();
+    \App\Item::whereMeta('price', '500')->get();
+    \App\Item::whereMeta('price', 'LIKE', '%50%')->get();
+    \App\Item::orWhereMeta('price', '500')->get();
+    \App\Item::orWhereMeta('price', 'LIKE', '%50%')->get();
 
-###with Where clause
+## 2. whereMetaIn
 
-You can use the following `where` methods for meta table when retrieving data.  
+    \App\Item::whereMetaIn('price', [300, 500])->get();
+    \App\Item::orWhereMetaIn('price', [300, 500])->get();
 
-* whereMeta
-* orWhereMeta
-* whereBetweenMeta
-* whereNotBetweenMeta
-* whereInMeta
-* whereNotInMeta
-* whereNullMeta
-* whereNotNullMeta
+## 3. whereMetaNotIn
 
-Usage is the same with original where methods like this.
+    \App\Item::whereMetaNotIn('price', [300, 500])->get();
+    \App\Item::orWhereMetaNotIn('price', [300, 500])->get();
 
-    $items = \App\Item::where('id', '>', 0)
-                ->whereMeta('size', '1')
-                ->whereBetweenMeta('size', [1, 2])
-                ->whereNotBetweenMeta('size', [3, 5])
-                ->whereInMeta('size', [1, 5])
-                ->whereNotInMeta('size', [2, 3, 4])
-                ->whereNullMeta('memo')
-                ->whereNotNullMeta('memo')
-                ->orWhereMeta('size', 'LIKE', '%5%')
-                ->get();
+## 4. whereMetaNull
 
-*The first argument means meta key you want to get.
+    \App\Item::whereMetaNull('price')->get();
+    \App\Item::orWhereMetaNull('price')->get();
 
-About original value
-====
+## 5. whereMetaNotNull
 
-Of course you also can set original value at the same time like the next.
+    \App\Item::whereMetaNotNull('price')->get();
+    \App\Item::orWhereMetaNotNull('price')->get();
 
-    $item = new \App\Item;
-    $item->title = 500;     // Original value
-    $item->size = 3.5;      // Meta value
-    $item->save();
-
-About value type
-====
-
-Meta value's type will be automatically casted.  
-So you don't need to take care about it.
-
-License
-====
-
-This package is licensed under the MIT License.
-
-Copyright 2015 Sukohi Kuhoh
+# License
+This package is licensed under the MIT License.  
+Copyright 2019 Sukohi Kuhoh
