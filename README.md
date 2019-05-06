@@ -111,6 +111,14 @@ If you'd like metadata to include in model data, set `meta` to `$appends`.
     \App\Item::whereMetaNotNull('price')->get();
     \App\Item::orWhereMetaNotNull('price')->get();
 
+# OrderByMeta
+
+    \App\Item::orderByMeta($key', 'asc')->get();
+    \App\Item::orderByMeta($key', 'desc')->get();
+
+**Note:** This method uses `FIELD(value, val1, val2, val3, ...)` function in SQL.  
+It means if your DB system does not have the function, this feature is **not available**. MySQL has it, though.
+
 # License
 This package is licensed under the MIT License.  
 Copyright 2019 Sukohi Kuhoh
